@@ -1,66 +1,60 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# CareLink Follow-Up, Laravel 12 vertical slice
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+This is a small assessment application using **synthetic** patient records only. It is a facility-server module: clinic browsers talk to the Laravel app installed on their local facility server. No browser patient cache or offline browser database is used. National synchronisation is a **design proposal**, not implemented here.
 
-## About Laravel
+## Requirements
+PHP 8.2+, Composer 2, PHP extensions `pdo_sqlite`, `sqlite3`, `mbstring`, `openssl`, `fileinfo`, Node.js 20+, npm. Laravel 12, React 18, TypeScript 5, Vite 6 and SQLite. MySQL/PostgreSQL are appropriate in production.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Start from a clean machine
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+```bash
+composer install
+cp .env.example .env
+php artisan key:generate
+```
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+Create the SQLite file: on Git Bash `touch database/database.sqlite`, or in PowerShell `New-Item database/database.sqlite -ItemType File`. Update `DB_DATABASE` in `.env` to the **absolute path** if your Laravel/SQLite setup does not resolve the relative path.
 
-## Learning Laravel
+```bash
+php artisan migrate:fresh --seed
+npm install
+npm run build
+php artisan serve
+```
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+Open http://127.0.0.1:8000. For hot reload, also run `npm run dev` in another terminal. Demo credentials are selected in the UI; the API accepts `demo-clinician-0101` and `demo-district` bearer tokens. These are deliberately not production credentials.
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+## Run all tests
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+```bash
+php artisan test
+npm test
+```
 
-## Laravel Sponsors
+For load testing, reset and seed 100,000 synthetic patients and **400,000 visits** (takes longer):
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+```bash
+LARGE_SEED=1 php artisan migrate:fresh --seed
+```
 
-### Premium Partners
+PowerShell: `$env:LARGE_SEED='1'; php artisan migrate:fresh --seed; Remove-Item Env:LARGE_SEED`. WARNING: `migrate:fresh` deletes the configured demo database tables.
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+## API
 
-## Contributing
+`GET /api/follow-up?facility_id=FAC-0101&status=overdue&overdue_days=7&sort=days_overdue_desc&page=1&page_size=50`
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+`POST /api/follow-up/p_1/contacted` with body `{ "contacted_at": "2026-10-06T09:00:00Z", "note": "Called", "interaction_id": "<UUID>" }` returns 204. Retry with the **same** interaction ID and exact content for safe replay; a changed request with the same ID returns 409. Contact attempts are append-only. Duplicate concurrent submissions are constrained by a unique index; a concurrent race may surface as a server error, not a finished production-grade replay handler.
 
-## Code of Conduct
+### Interpretation of ambiguous requirements
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Only the **most recent visit** determines eligibility. The appointment date on that visit must exist. `overdue` means **more than** n whole Lusaka calendar days late. `missed` means 1 through n days late. `due_soon` means today through 7 days into the future. A visit on the appointment date would become the latest visit and supersede the old appointment. Ties on visit date use the larger visit ID. The sample response labels an eight-day-late patient `missed` despite the written default threshold of seven days; this implementation follows the **written strict rule**. Dates come from the `Africa/Lusaka` facility calendar, not the computer clock.
 
-## Security Vulnerabilities
+## Trade-offs, security and performance
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+Filtering, sorting and pagination run in SQL, not PHP or React. An indexed anti-join checks whether a later visit exists. Each screen receives at most 100 rows. This is designed to remain usable for a 10,000-row follow-up list; **measured before-and-after browser timing must still be collected on the candidate's laptop**. Do not claim a performance result before measuring it. Clinical data should be stored on managed encrypted facility servers, accessed using secure sessions and role-based access controls. Replace these static demo tokens with central identity federation, short-lived sessions, audited permission checks, TLS, and secret management before any real deployment.
 
-## License
+Accessibility: semantic table and headings; controls with visible labels; a live region for loading/error feedback; keyboard-native buttons/selects. Status uses text as well as colour. I did not implement row virtualization because server pagination bounds the rows. Front-end service tests check URL/token handling and API errors; back-end feature tests cover statuses, date boundaries, latest visit, permissions, validation, paging and idempotency.
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## Deliberately outside this slice
+
+Full login, national sync, robust outage retry queues, reconciliation, laboratory FHIR integration, reporting integration, structured logs beyond API metadata, deployment orchestration, infrastructure monitoring and full 100k-dataset performance measurement. See Sections A and D for the proposed production approach. Demonstrate and explain code before submitting, and document all AI assistance truthfully in `declaration.md`.
