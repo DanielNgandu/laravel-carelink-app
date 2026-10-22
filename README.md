@@ -45,8 +45,8 @@ The demonstration accounts must be created or seeded in your local database befo
 
 | Account | Email | Password |
 |---|---|---|
-| Clinician | `clinician@carelink.test` | `DemoPass123!` |
-| District Officer | `district@carelink.test` | `DemoPass123!` |
+| Clinician | `clinician@carelink.mail` | `DemoPass123!` |
+| District Officer | `district@carelink.mail` | `DemoPass123!` |
 
 These are **local demonstration credentials only**. Never use them in a real clinical deployment.
 
