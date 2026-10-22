@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <meta name="csrf-token" content="{{ csrf_token() }}">    <title>CareLink Follow-Up</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CareLink Follow-Up</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     
 </head>
@@ -29,17 +31,9 @@
     <section class="rounded-xl bg-white p-5 shadow-sm" aria-labelledby="filter-heading">
         <h2 id="filter-heading" class="mb-4 text-xl font-semibold">Find patients</h2>
         <form id="filters" class="grid gap-4 md:grid-cols-3">
-            <div>
-                <label for="token" class="block font-medium">Demo user</label>
-                <select id="token" class="mt-1 w-full rounded border border-slate-400 p-2">
-                    @foreach(config('carelink.tokens', []) as $token => $actor)
-                        <option value="{{ $token }}">{{ $actor['role'] }}{{ $actor['facility_id'] ? ' (' . $actor['facility_id'] . ')' : '' }}</option>
-                    @endforeach
-                </select>
-            </div>
-            <div>
+<div>
                 <label for="facility" class="block font-medium">Facility ID</label>
-                <input id="facility" type="text" value="FAC-0101" maxlength="30" class="mt-1 w-full rounded border border-slate-400 p-2" placeholder="FAC-0101">
+                <input id="facility" type="text" value="{{ auth()->user()->role === 'CLINICIAN' ? auth()->user()->facility_id : '' }}" maxlength="30" class="mt-1 w-full rounded border border-slate-400 p-2" placeholder="FAC-0101">
             </div>
             <div>
                 <label for="status" class="block font-medium">Follow-up status</label>
@@ -134,36 +128,7 @@
 };
 
 const canRecordContact = currentUser.role === 'CLINICIAN';
-    const response = await fetch(
-    `/follow-up/data?${params.toString()}`,
-    {
-        credentials: 'same-origin',
-        headers: {
-            'Accept': 'application/json'
-        },
-        cache: 'no-store'
-    }
-);
-const response = await fetch(
-    `${apiUrl}/${encodeURIComponent(state.selectedPatient.id)}/contacted`,
-    {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': document.querySelector(
-                'meta[name="csrf-token"]'
-            ).content
-        },
-        body: JSON.stringify(state.operation)
-    }
-);
-    const currentUser = {
-        role: @json(auth()->user()->role),
-        facility_id: @json(auth()->user()->facility_id)
-    };
-    const token = () => $('token').value;
+
     const td = (value) => { const cell = document.createElement('td'); cell.className = 'border-b border-slate-200 p-3'; cell.textContent = String(value ?? 'Not recorded'); return cell; };
     const showError = (text) => { $('errorText').textContent = text; $('errorPanel').classList.remove('hidden'); };
     const clearError = () => { $('errorText').textContent = ''; $('errorPanel').classList.add('hidden'); };
@@ -238,7 +203,7 @@ async function load() {
             }
         );
 
-        if (response.status === 401) {
+        if (response.status === 401 || response.redirected && response.url.includes('/login')) {
             window.location.href = '/login';
             return;
         }
@@ -308,6 +273,9 @@ async function load() {
         body: JSON.stringify(state.operation)
     }
 );
+            if (response.status === 401 || response.status === 419) {
+                throw new Error('Your session expired. Sign in again, then retry with a new contact attempt.');
+            }
             if (!response.ok) {
                 const body = await response.json().catch(() => ({}));
                 throw new Error(body.error?.message ?? body.message ?? `Request failed (${response.status})`);

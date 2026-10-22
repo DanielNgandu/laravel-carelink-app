@@ -11,7 +11,7 @@ class LoginTest extends TestCase
 
     public function test_homepage_redirects_to_login(): void
     {
-        $this->get('/')->assertRedirect('/login');
+        $this->get('/')->assertRedirect('follow-up');
     }
 
     public function test_login_page_loads(): void

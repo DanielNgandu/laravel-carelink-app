@@ -4,7 +4,13 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
 class DatabaseSeeder extends Seeder {
+  
  public function run(): void {
+
+  $this->call([
+            UserSeeder::class,
+        ]);
+
   $facilities = [['id'=>'FAC-0101','name'=>'Mwansa Urban Clinic','district'=>'Mwansa'],
     ['id'=>'FAC-0207','name'=>'Kalemba Rural Health Centre','district'=>'Kalemba'],
     ['id'=>'FAC-0312','name'=>'Chembe District Hospital','district'=>'Chembe']];
